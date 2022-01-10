@@ -1,4 +1,4 @@
-from layers2 import PathEmbedding
+from layers import PathEmbedding
 import tensorflow as tf
 
 paths = [0,1,3,2]
