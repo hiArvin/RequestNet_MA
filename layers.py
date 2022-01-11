@@ -3,19 +3,18 @@ from tensorflow.keras.layers import Layer
 
 
 class PathEmbedding(Layer):
-    def __init__(self, num_paths, num_edges, link_state_dim, path_state_dim, paths, index, sequences,
+    def __init__(self, num_paths, path_state_dim, paths, index, sequences,
                  act=None, **kwargs):
         super(PathEmbedding, self).__init__(**kwargs)
         self.num_paths = num_paths
-        self.num_edges = num_edges
         self.paths = paths
         self.idx = index
         self.seqs = sequences
-        self.link_state_dim = link_state_dim  # + num_requests
         self.path_state_dim = path_state_dim
         self.act = act
 
     def build(self, input_shape):
+        self.num_edges, self.link_state_dim = input_shape
         initializer = tf.keras.initializers.GlorotUniform()
         # gru cell
         self.path_update = tf.keras.layers.GRUCell(self.path_state_dim)
@@ -47,3 +46,31 @@ class PathEmbedding(Layer):
         context = tf.matmul(self.att, value)
         return context
 
+
+class FlowPointer(Layer):
+    def __init__(self,hidden_dim1, hidden_dim2,**kwargs):
+        super(FlowPointer, self).__init__(**kwargs)
+        self.hidden_dim1 = hidden_dim1
+        self.hidden_dim2 = hidden_dim2
+
+    def build(self, input_shape):
+        print(input_shape)
+        self.num_paths, _, self.path_state_dim = input_shape
+        initializer = tf.keras.initializers.GlorotUniform()
+        # Trainable parameters
+
+        self.RNN = tf.keras.layers.SimpleRNN(self.hidden_dim1, return_sequences=True, return_state=True)
+        self.wq = initializer([self.hidden_dim1, self.hidden_dim2])
+        self.wk = initializer([self.hidden_dim1, self.hidden_dim2])
+
+
+    def call(self, inputs):
+        # path_state = tf.reshape(inputs, [1, self.num_paths, self.path_state_dim])
+        hidden_state, flow_state = self.RNN(inputs)
+        key = tf.matmul(hidden_state, self.wk)
+        query = tf.matmul(flow_state, self.wq)
+        att = tf.matmul(key, tf.expand_dims(query, -1))
+        att = tf.squeeze(att)
+
+        # att = tf.nn.softmax(att)
+        return att
