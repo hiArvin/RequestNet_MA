@@ -1,4 +1,5 @@
 import tensorflow as tf
+from data_processer import DataProcesser
 from actor_critic import Actor, Critic
 
 class MADDPG:
@@ -6,7 +7,6 @@ class MADDPG:
         self.agent_id = agent_id
         self.src = src
         self.dst = dst
-        self.paths = paths
 
         # create network
         self.actor_network = Actor()

@@ -1,29 +1,25 @@
-import tensorflow as tf
-from test_layer import PathEmbedding, FlowPointer
+import numpy as np
+from maddpg import MADDPG
 
+class Agent:
+    def __init__(self,args, agent_id,src,dst,paths):
+        self.args = args
+        self.agent_id = agent_id
+        self.policy=MADDPG()
 
-class Actor:
-    def __init__(self, src, dst, num_paths, paths, idx, seq, theta1, theta2, theta3):
-        self.src = src
-        self.dst = dst
-        self.num_path = num_paths
-        self.pem_layer = PathEmbedding(num_paths=num_paths,
-                                       path_state_dim=theta1,
-                                       paths=paths,
-                                       index=idx,
-                                       sequences=seq)
-        self.ptr_layer = FlowPointer(hidden_dim1=theta2, hidden_dim2=theta3)
+    def select_action(self, o, noise_rate, epsilon):
+        if np.random.uniform() < epsilon:
+            u = np.random.uniform(-self.args.high_action, self.args.high_action, self.args.action_shape[self.agent_id])
+        else:
+            # inputs = torch.tensor(o, dtype=torch.float32).unsqueeze(0)
+            pi = self.policy.actor_network(o).squeeze(0)
+            # print('{} : {}'.format(self.name, pi))
+            u = pi.cpu().numpy()
+            noise = noise_rate * self.args.high_action * np.random.randn(*u.shape)  # gaussian noise
+            u += noise
+            u = np.clip(u, -self.args.high_action, self.args.high_action)
+        return u.copy()
 
-    def forward(self, input):
-        path_embedding = self.pem_layer(input)
-        outs = self.ptr_layer(path_embedding)
-        return outs
-
-
-class Critic:
-    def __init__(self):
-        pass
-
-    def forward(self,states, actions):
+    def learn(self,transitions,other_agents):
         pass
 
