@@ -9,17 +9,17 @@ index = [0,0,1,1]
 sequences =[0,1,0,1]
 
 
-actor = Actor(src=1, dst=1, num_paths=2, paths=paths, idx=index, seq=sequences, theta1=2, theta2=2, theta3=2)
+actor = Actor(num_paths=2, paths=paths, idx=index, seq=sequences, theta1=2, theta2=2, theta3=1)
 
 x = tf.ones((4,2))
 
 y = actor(x)
 
-target_actor = Actor(src=1, dst=1, num_paths=2, paths=paths, idx=index, seq=sequences, theta1=2, theta2=2, theta3=2)
+# target_actor = Actor(num_paths=2, paths=paths, idx=index, seq=sequences, theta1=2, theta2=2, theta3=2)
 
-for layer in target_actor.layers:
-    target_actor.variables = actor.variables
-print(actor.trainable_variables)
+# for layer in target_actor.layers:
+#     target_actor.variables = actor.variables
+# print(actor.trainable_variables)
 print(y)
 # y = my_layer1(x)
 # # z = my_layer2(y)
