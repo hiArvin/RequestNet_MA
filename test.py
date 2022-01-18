@@ -12,15 +12,24 @@ sequences =[0,1,0,1]
 actor = Actor(num_paths=2, paths=paths, idx=index, seq=sequences, theta1=2, theta2=2, theta3=1)
 
 x = tf.ones((4,2))
-
 y = actor(x)
+print('y outs',y)
+print('variables',actor.variables)
+for var in actor.variables:
+    # print('name',name)
+    print('var',var)
+    var.assign(var)
+z = actor(x)
+print(z)
+# actor.trainable_variables.se
+
 
 # target_actor = Actor(num_paths=2, paths=paths, idx=index, seq=sequences, theta1=2, theta2=2, theta3=2)
 
 # for layer in target_actor.layers:
 #     target_actor.variables = actor.variables
 # print(actor.trainable_variables)
-print(y)
+
 # y = my_layer1(x)
 # # z = my_layer2(y)
 # print(y.numpy())

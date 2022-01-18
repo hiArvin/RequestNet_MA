@@ -15,16 +15,21 @@ class PathEmbedding(Layer):
 
     def build(self, input_shape):
         self.num_edges, self.link_state_dim = input_shape
-        initializer = tf.keras.initializers.GlorotUniform()
         # gru cell
         self.path_update = tf.keras.layers.GRUCell(self.path_state_dim)
         self.path_update.build(tf.TensorShape([None, self.link_state_dim]))
         self.rnn_layer = tf.keras.layers.RNN(self.path_update, return_sequences=True, return_state=True)
 
         # attention
-        self.wq = initializer([self.path_state_dim, self.path_state_dim])
-        self.wk = initializer([self.path_state_dim, self.path_state_dim])
-        self.wv = initializer([self.path_state_dim, self.path_state_dim])
+        self.wq = self.add_weight(shape=[self.path_state_dim, self.path_state_dim],
+                                  initializer=tf.keras.initializers.GlorotUniform,
+                                  trainable=True,name='att_q')
+        self.wk = self.add_weight(shape=[self.path_state_dim, self.path_state_dim],
+                                  initializer=tf.keras.initializers.GlorotUniform,
+                                  trainable=True,name='att_k')
+        self.wv = self.add_weight(shape=[self.path_state_dim, self.path_state_dim],
+                                  initializer=tf.keras.initializers.GlorotUniform,
+                                  trainable=True,name='att_v')
 
     def call(self, inputs):
         # RNN

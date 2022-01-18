@@ -1,86 +1,53 @@
+import threading
 import numpy as np
-import random
 
-class ReplayBuffer(object):
-    def __init__(self, size):
-        """Create Prioritized Replay buffer.
 
-        Parameters
-        ----------
-        size: int
-            Max number of transitions to store in the buffer. When the buffer
-            overflows the old memories are dropped.
-        """
-        self._storage = []
-        self._maxsize = int(size)
-        self._next_idx = 0
+class Buffer:
+    def __init__(self, args):
+        self.size = args.buffer_size
+        self.args = args
+        # memory management
+        self.current_size = 0
+        # create the buffer to store info
+        self.buffer = dict()
+        for i in range(self.args.n_agents):
+            self.buffer['o_%d' % i] = np.empty([self.size, self.args.obs_shape[i]])
+            self.buffer['u_%d' % i] = np.empty([self.size, self.args.action_shape[i]])
+            self.buffer['r_%d' % i] = np.empty([self.size])
+            self.buffer['o_next_%d' % i] = np.empty([self.size, self.args.obs_shape[i]])
+        # thread lock
+        self.lock = threading.Lock()
 
-    def __len__(self):
-        return len(self._storage)
-
-    def clear(self):
-        self._storage = []
-        self._next_idx = 0
-
-    def add(self, obs_t, action, reward, obs_tp1, done):
-        data = (obs_t, action, reward, obs_tp1, done)
-
-        if self._next_idx >= len(self._storage):
-            self._storage.append(data)
-        else:
-            self._storage[self._next_idx] = data
-        self._next_idx = (self._next_idx + 1) % self._maxsize
-
-    def _encode_sample(self, idxes):
-        obses_t, actions, rewards, obses_tp1, dones = [], [], [], [], []
-        for i in idxes:
-            data = self._storage[i]
-            obs_t, action, reward, obs_tp1, done = data
-            obses_t.append(np.array(obs_t, copy=False))
-            actions.append(np.array(action, copy=False))
-            rewards.append(reward)
-            obses_tp1.append(np.array(obs_tp1, copy=False))
-            dones.append(done)
-        return np.array(obses_t), np.array(actions), np.array(rewards), np.array(obses_tp1), np.array(dones)
-
-    def make_index(self, batch_size):
-        return [random.randint(0, len(self._storage) - 1) for _ in range(batch_size)]
-
-    def make_latest_index(self, batch_size):
-        idx = [(self._next_idx - 1 - i) % self._maxsize for i in range(batch_size)]
-        np.random.shuffle(idx)
-        return idx
-
-    def sample_index(self, idxes):
-        return self._encode_sample(idxes)
-
+    # store the episode
+    def store_episode(self, o, u, r, o_next):
+        idxs = self._get_storage_idx(inc=1)  # 以transition的形式存，每次只存一条经验
+        for i in range(self.args.n_agents):
+            with self.lock:
+                self.buffer['o_%d' % i][idxs] = o[i]
+                self.buffer['u_%d' % i][idxs] = u[i]
+                self.buffer['r_%d' % i][idxs] = r[i]
+                self.buffer['o_next_%d' % i][idxs] = o_next[i]
+    
+    # sample the data from the replay buffer
     def sample(self, batch_size):
-        """Sample a batch of experiences.
+        temp_buffer = {}
+        idx = np.random.randint(0, self.current_size, batch_size)
+        for key in self.buffer.keys():
+            temp_buffer[key] = self.buffer[key][idx]
+        return temp_buffer
 
-        Parameters
-        ----------
-        batch_size: int
-            How many transitions to sample.
-
-        Returns
-        -------
-        obs_batch: np.array
-            batch of observations
-        act_batch: np.array
-            batch of actions executed given obs_batch
-        rew_batch: np.array
-            rewards received as results of executing act_batch
-        next_obs_batch: np.array
-            next set of observations seen after executing act_batch
-        done_mask: np.array
-            done_mask[i] = 1 if executing act_batch[i] resulted in
-            the end of an episode and 0 otherwise.
-        """
-        if batch_size > 0:
-            idxes = self.make_index(batch_size)
+    def _get_storage_idx(self, inc=None):
+        inc = inc or 1
+        if self.current_size+inc <= self.size:
+            idx = np.arange(self.current_size, self.current_size+inc)
+        elif self.current_size < self.size:
+            overflow = inc - (self.size - self.current_size)
+            idx_a = np.arange(self.current_size, self.size)
+            idx_b = np.random.randint(0, self.current_size, overflow)
+            idx = np.concatenate([idx_a, idx_b])
         else:
-            idxes = range(0, len(self._storage))
-        return self._encode_sample(idxes)
-
-    def collect(self):
-        return self.sample(-1)
+            idx = np.random.randint(0, self.size, inc)
+        self.current_size = min(self.size, self.current_size+inc)
+        if inc == 1:
+            idx = idx[0]
+        return idx
