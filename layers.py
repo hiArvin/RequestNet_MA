@@ -1,4 +1,5 @@
 import tensorflow as tf
+import copy as cp
 from tensorflow.keras.layers import Layer
 
 
@@ -14,7 +15,7 @@ class PathEmbedding(Layer):
         self.act = act
 
     def build(self, input_shape):
-        self.num_edges, self.link_state_dim = input_shape
+        self.batch_size, self.num_edges, self.link_state_dim = input_shape
         # gru cell
         self.path_update = tf.keras.layers.GRUCell(self.path_state_dim)
         self.path_update.build(tf.TensorShape([None, self.link_state_dim]))
@@ -33,14 +34,17 @@ class PathEmbedding(Layer):
 
     def call(self, inputs):
         # RNN
-        h_tild = tf.gather(inputs, self.paths)
+        h_tild = tf.gather(inputs,self.paths,axis=1)
+        batch = tf.range(self.batch_size)
+        batch = tf.tile(tf.expand_dims(batch, axis=1), (1, len(self.idx)))
+        batch = tf.expand_dims(batch,-1)
         ids = tf.stack([self.idx, self.seqs], axis=1)
+        ids = tf.tile(tf.expand_dims(ids,0), (self.batch_size,1, 1))
+        ids = tf.concat([batch, ids], axis=-1)
         max_len = tf.reduce_max(self.seqs) + 1
-        shape = tf.stack([self.num_paths, max_len, self.link_state_dim])
-        lens = tf.math.segment_sum(data=tf.ones_like(self.idx),
-                                   segment_ids=self.idx)
+        shape = tf.stack([self.batch_size,self.num_paths, max_len, self.link_state_dim])
         link_inputs = tf.scatter_nd(ids, h_tild, shape)
-
+        link_inputs=tf.reshape(link_inputs,[self.batch_size*self.num_paths, max_len, self.link_state_dim])
         hidden_states, last_state = self.rnn_layer(link_inputs)
 
         key = tf.matmul(hidden_states, self.wk)
@@ -49,11 +53,12 @@ class PathEmbedding(Layer):
         self.att = tf.matmul(key, tf.expand_dims(query, -1))
         self.att = tf.transpose(self.att, [0, 2, 1])
         context = tf.matmul(self.att, value)
+        context = tf.reshape(context, [self.batch_size,self.num_paths,self.path_state_dim])
         return context
 
 
 class FlowPointer(Layer):
-    def __init__(self,hidden_dim1, hidden_dim2,**kwargs):
+    def __init__(self,hidden_dim1, hidden_dim2=1,**kwargs):
         super(FlowPointer, self).__init__(**kwargs)
         self.hidden_dim1 = hidden_dim1
         self.hidden_dim2 = hidden_dim2
@@ -70,12 +75,11 @@ class FlowPointer(Layer):
 
 
     def call(self, inputs):
-        # path_state = tf.reshape(inputs, [1, self.num_paths, self.path_state_dim])
         hidden_state, flow_state = self.RNN(inputs)
         key = tf.matmul(hidden_state, self.wk)
         query = tf.matmul(flow_state, self.wq)
         att = tf.matmul(key, tf.expand_dims(query, -1))
         att = tf.squeeze(att)
 
-        # att = tf.nn.softmax(att)
+        att = tf.nn.softmax(att)
         return att

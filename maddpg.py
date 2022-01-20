@@ -11,8 +11,11 @@ class MADDPG:
         self.src = src
         self.dst = dst
         self.num_paths = num_paths
+
+        self.tau = 1.0 - 1e-2
+
         paths,idxs,seqs = DataProcesser.get_paths_inputs(src,dst)
-        # create netwo rk
+        # create network
         self.actor_network = Actor(num_paths,paths,idxs,seqs)
         self.critic_network = Critic()
 
@@ -30,6 +33,13 @@ class MADDPG:
 
 
         # TODO:for saving model
+
+    def _soft_update_target_network(self):
+        for target_variable,variable in zip(self.actor_target_network.variables,self.actor_network.variables):
+            target_variable.assign((1 - self.tau) * target_variable + self.tau * variable)
+        for target_variable,variable in zip(self.critic_target_network.variables,self.critic_network.variables):
+            target_variable.assign((1 - self.tau) * target_variable + self.tau * variable)
+
 
     def train(self, transitions, other_agents):
         # for key in transitions.keys():
@@ -53,10 +63,15 @@ class MADDPG:
                     # 因为传入的other_agents要比总数少一个，可能中间某个agent是当前agent，不能遍历去选择动作
                     u_next.append(other_agents[index].policy.actor_target_network(o_next[agent_id]))
                     index += 1
+
+            # TODO: processing u next to critic input
+            # let data processor to do this
             q_next = self.critic_target_network(o_next, u_next)
 
             target_q = (r + self.args.gamma * q_next)
+
         # the q loss
+        # let data processor to do this
         q_value = self.critic_network(o, u)
         critic_loss = (target_q - q_value).pow(2).mean()
 
@@ -70,9 +85,7 @@ class MADDPG:
         self.critic_optim.apply_gradients(zip(critic_grad,self.critic_network.trainable_variables))
 
         # update target net
-        update_target(self.actor_network, self.actor_target_network)
-        update_target(self.critic_network, self.critic_target_network)
-
+        self._soft_update_target_network()
 
 
     def save_model(self):

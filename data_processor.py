@@ -3,11 +3,15 @@ import copy as cp
 import numpy as np
 
 class DataProcesser:
-    _sd_pair_to_paths={}
+    _sd_pair_to_paths = {}
+    _link_to_node = {}
+    _path_mask = [   ]
 
     def __init__(self,node_graph):
         self.node_graph = node_graph
         self.edge_graph = self.node_graph_to_edge_graph(node_graph)
+        for idx, edges in enumerate(nx.edges(self.node_graph)):
+            self._link_to_node[edges]=idx
 
     def node_graph_to_edge_graph(self, node_graph):
         edge_graph = None
@@ -82,3 +86,7 @@ class DataProcesser:
         path = paths[selection]
         return path
 
+    @classmethod
+    def actor_inputs(cls,bw,tm):
+
+        return obs
