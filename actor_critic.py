@@ -25,6 +25,7 @@ class Actor(tf.Module):
     def __call__(self, x):
         for layer in self.layers:
             x = layer(x)
+        x = tf.nn.softmax(x)
         return x
 
 

@@ -64,7 +64,6 @@ class FlowPointer(Layer):
         self.hidden_dim2 = hidden_dim2
 
     def build(self, input_shape):
-        print(input_shape)
         self.num_paths, _, self.path_state_dim = input_shape
         initializer = tf.keras.initializers.GlorotUniform()
         # Trainable parameters

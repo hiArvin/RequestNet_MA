@@ -2,38 +2,38 @@ import networkx as nx
 import copy as cp
 import numpy as np
 
+
 class DataProcesser:
     _sd_pair_to_paths = {}
     _link_to_node = {}
-    _path_mask = [   ]
+    _paths_mask = {}  # dict, (src,dst):np array with shape, [num_nodes,num_paths]
 
-    def __init__(self,node_graph):
+    def __init__(self, node_graph):
         self.node_graph = node_graph
         self.edge_graph = self.node_graph_to_edge_graph(node_graph)
-        for idx, edges in enumerate(nx.edges(self.node_graph)):
-            self._link_to_node[edges]=idx
+
+        for idx, edge in enumerate(nx.edges(self.node_graph)):
+            src,dst = edge
+            self._link_to_node[edge] = idx
+            self._link_to_node[(dst,src)] = idx
 
     def node_graph_to_edge_graph(self, node_graph):
         edge_graph = None
         return edge_graph
 
-    def all_k_shortest_paths(self):
-        for node_i in self.node_graph:
-            for node_j in self.node_graph:
-                if node_i==node_j:
+    def all_k_shortest_paths(self, num_paths):
+        n_nodes = nx.number_of_nodes(self.node_graph)
+        for node_i in range(n_nodes):
+            for node_j in range(n_nodes):
+                if node_i == node_j:
                     continue
-                paths = self.k_shortest_paths(node_i,node_j,k=3)
-                self._sd_pair_to_paths[(node_i, node_j)]=paths
-
+                paths = self.k_shortest_paths(node_i, node_j, k=num_paths)
+                DataProcesser._sd_pair_to_paths[(node_i, node_j)] = paths
+                paths_np = self.path_to_array(paths)
+                DataProcesser._paths_mask[(node_i,node_j)] = paths_np
 
     def k_shortest_paths(self, source, target, k=1, weight='weight'):
-        # G is a networkx graph.
-        # source and target are the labels for the source and target of the path.
-        # k is the amount of desired paths.
-        # weight = 'weight' assumes a weighed graph. If this is undesired, use weight = None.
-
         A = [nx.dijkstra_path(self.node_graph, source, target, weight='weight')]
-        # A_len = [sum([self.node_graph[A[0][l]][A[0][l + 1]]['weight'] for l in range(len(A[0]) - 1)])]
         B = []
 
         for i in range(1, k):
@@ -67,13 +67,27 @@ class DataProcesser:
 
         return A
 
+    def path_to_array(self, paths):
+        path_array = np.zeros([nx.number_of_edges(self.node_graph), len(paths)], dtype=np.int16)
+        for j, p in enumerate(paths):
+            for i in range(len(p) - 1):
+                idx = self._link_to_node[(p[i], p[i + 1])]
+                path_array[idx][j] = 1
+        return path_array
+
     @classmethod
-    def get_paths_inputs(cls, src,dst):
-        paths = cls._sd_pair_to_paths.get((src, dst))
-        pt=[]
+    def get_paths_inputs(cls, src:int, dst:int):
+        paths = cls._sd_pair_to_paths[(src, dst)]
+        trans_paths = []
+        for p in paths:
+            trans_p = []
+            for i in range(len(p) - 1):
+                trans_p.append(cls._link_to_node[p[i], p[i + 1]])
+            trans_paths.append(trans_p)
+        pt = []
         idx = []
         seq = []
-        for i,p in enumerate(paths):
+        for i, p in enumerate(trans_paths):
             for j, n in enumerate(p):
                 pt.append(n)
                 idx.append(i)
@@ -81,12 +95,35 @@ class DataProcesser:
         return pt, idx, seq
 
     @classmethod
-    def selection_to_path(cls,src,dst,selection):
-        paths = cls._sd_pair_to_paths.get((src, dst))
-        path = paths[selection]
-        return path
+    def split_to_traffic(cls, src, dst, split, traffic):
+        num_paths = len(split)
+        traffic_size = split * traffic
+        mask = cp.deepcopy(cls._paths_mask[(src,dst)])
+        for i in range(num_paths):
+            mask[:, i] = mask[:, i] * traffic_size[i]
+        occupy = np.sum(mask,axis=1)
+        return occupy
 
     @classmethod
-    def actor_inputs(cls,bw,tm):
+    def actor_inputs(cls, bw, tm):
+        '''
+        tm 矩阵
+        :param bw:
+        :param tm:
+        :return:
+        '''
+        paths_np = cp.deepcopy(cls._paths_mask)
+        n_sd = len(paths_np)
+        n_edges,n_paths = paths_np[(0,1)].shape
+        for sd_pair,p_mask in paths_np.items():
+            src,dst = sd_pair
+            paths_np[sd_pair] = p_mask*tm[src][dst]
 
-        return obs
+        request_np = np.concatenate(list(paths_np.values()),axis=1)
+
+        # 防0作为分母
+        bw = np.array(bw)
+        bw[bw == 0] = 1
+        bw = np.expand_dims(bw, -1)
+        input_features = request_np / np.tile(bw, [1, n_sd * n_paths])
+        return input_features

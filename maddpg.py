@@ -5,22 +5,21 @@ from actor_critic import Actor, Critic
 
 
 class MADDPG:
-    def __init__(self,args, num_paths,agent_id, src, dst):
+    def __init__(self,args, src, dst):
         self.args = args
-        self.agent_id = agent_id
         self.src = src
         self.dst = dst
-        self.num_paths = num_paths
+        self.num_paths = args.num_paths
 
         self.tau = 1.0 - 1e-2
 
         paths,idxs,seqs = DataProcesser.get_paths_inputs(src,dst)
         # create network
-        self.actor_network = Actor(num_paths,paths,idxs,seqs)
+        self.actor_network = Actor(args.num_paths,paths,idxs,seqs)
         self.critic_network = Critic()
 
         # build up the target network
-        self.actor_target_network = Actor(num_paths,paths,idxs,seqs)
+        self.actor_target_network = Actor(args.num_paths,paths,idxs,seqs)
         self.critic_target_network = Critic()
 
         # TODO:load weights into target
