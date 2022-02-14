@@ -11,28 +11,32 @@ class Buffer:
         # create the buffer to store info
         self.buffer = dict()
         self.num_nodes =num_nodes
+        self.buffer['o'] = np.empty([self.size, obs_shape[0],obs_shape[1]])
+        self.buffer['o_next'] = np.empty([self.size, obs_shape[0],obs_shape[1]])
         for i in range(num_nodes):
             for j in range(num_nodes):
                 if i == j:
                     continue
-                self.buffer['o_%d_%d' % (i, j)] = np.empty([self.size, obs_shape])
+                # self.buffer['o_%d_%d' % (i, j)] = np.empty([self.size, obs_shape])
                 self.buffer['u_%d_%d' % (i, j)] = np.empty([self.size, action_shape])
                 self.buffer['r_%d_%d' % (i, j)] = np.empty([self.size])
-                self.buffer['o_next_%d_%d' % (i, j)] = np.empty([self.size, obs_shape])
+                # self.buffer['o_next_%d_%d' % (i, j)] = np.empty([self.size, obs_shape])
         # thread lock
         self.lock = threading.Lock()
 
     # store the episode
     def store_episode(self, o, u, r, o_next):
         idxs = self._get_storage_idx(inc=1)  # 以transition的形式存，每次只存一条经验
+        self.buffer['o'][idxs] = o
+        self.buffer['o_next'][idxs] = o_next
         for i in range(self.num_nodes):
             for j in range(self.num_nodes):
                 if i==j: continue
                 with self.lock:
-                    self.buffer['o_%d_%d' % (i, j)][idxs] = o[i]
-                    self.buffer['u_%d_%d' % (i, j)][idxs] = u[i]
-                    self.buffer['r_%d_%d' % (i, j)][idxs] = r[i]
-                    self.buffer['o_next_%d_%d' % (i, j)][idxs] = o_next[i]
+                    # self.buffer['o_%d_%d' % (i, j)][idxs] = o[i]
+                    self.buffer['u_%d_%d' % (i, j)][idxs] = u[(i,j)]
+                    self.buffer['r_%d_%d' % (i, j)][idxs] = r[(i,j)]
+                    # self.buffer['o_next_%d_%d' % (i, j)][idxs] = o_next[i]
 
     # sample the data from the replay buffer
     def sample(self, batch_size):

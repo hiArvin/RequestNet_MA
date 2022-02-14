@@ -32,7 +32,8 @@ class Runner:
         return agents
 
     def run(self):
-        for time_step in range(3):
+        obs = self.env.reset()
+        for time_step in range(5):
             # reset the environment
             if time_step % self.episode_limit == 0:
                 obs = self.env.reset()
@@ -41,10 +42,18 @@ class Runner:
             for sd_pair, agent in self.agents.items():
                 action = agent.select_action(np.expand_dims(obs,axis=0),self.epsilon)
                 actions[sd_pair]=action
-            obs_next,reward,done=self.env.step(actions)
-            print(reward)
+            obs_next,rewards,done=self.env.step(actions)
+            self.buffer.store_episode(obs,actions,rewards,obs_next)
             obs = obs_next
-            self.buffer.
+            if self.buffer.current_size >= self.args.batch_size:
+                transitions = self.buffer.sample(self.args.batch_size)
+                for idx, agent in self.agents.items():
+                    other_agents = self.agents.copy()
+                    del other_agents[idx]
+                    agent.learn(transitions, other_agents)
+
+
+
 
 
 

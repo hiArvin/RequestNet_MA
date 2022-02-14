@@ -27,7 +27,7 @@ class Environment:
 
         # print(graph.edges)
 
-    def generate_traffic_matrix(self):
+    def generate_traffic_mgenerate_traffic_matrixatrix(self):
         traffic_matrix = np.random.normal(5, 1, [7, 7]).astype(np.int16)
         # print(traffic_matrix)
         return traffic_matrix
@@ -38,7 +38,8 @@ class Environment:
         self.counter = 0
         new_tm = self.generate_tm()
         self.last_tm = new_tm
-        obs = DataProcesser.actor_inputs(self.rest_bd,new_tm)
+        obs = DataProcesser.actor_inputs(self.rest_bd, new_tm)
+
         return obs
 
     def step(self, actions):
@@ -54,7 +55,21 @@ class Environment:
         utility = 1 - rest_bd / self.bandwidth
         # print(self.bandwidth)
         # print(utility)
-        reward = -np.round(np.max(utility), decimals=3)
+        # reward 设计的不对，应该是每个agent有一个reward,最好改成
+        rewards = np.zeros([self.num_nodes, self.num_nodes],dtype=np.float32)
+        for i in range(self.num_nodes):
+            for j in range(self.num_nodes):
+                if i == j:
+                    continue
+                mask = DataProcesser.get_path_mask(i, j).astype(np.float32)
+                ac = actions[(i, j)]
+                ac = np.squeeze(ac)
+                for p in range(self.num_paths):
+                    mask[:, p] = mask[:, p] * utility * ac[p]
+                mask = np.sum(mask, axis=1)
+                reward = -np.round(np.max(mask), decimals=3)
+                rewards[i, j] = reward
+        # reward = -np.round(np.max(utility), decimals=3)
         if self.counter >= 20:
             done = True
         else:
@@ -62,11 +77,11 @@ class Environment:
         new_tm = self.generate_tm()
         self.last_tm = new_tm
         # print(new_tm)
-        obs = DataProcesser.actor_inputs(rest_bd,new_tm)
-        return obs, reward, done
+        obs = DataProcesser.actor_inputs(rest_bd, new_tm)
+        return obs, rewards, done
 
     def generate_tm(self):
         tm = np.random.uniform(5, 8, size=[7, 7]).astype(np.int16)
         for i in range(self.num_nodes):
-            tm[i,i] = 0
+            tm[i, i] = 0
         return tm

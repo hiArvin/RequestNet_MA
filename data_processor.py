@@ -98,6 +98,8 @@ class DataProcesser:
     def split_to_traffic(cls, src, dst, split, traffic):
         num_paths = len(split)
         traffic_size = split * traffic
+        traffic_size = np.squeeze(traffic_size)
+        print(traffic_size)
         mask = cp.deepcopy(cls._paths_mask[(src,dst)])
         for i in range(num_paths):
             mask[:, i] = mask[:, i] * traffic_size[i]
@@ -127,3 +129,23 @@ class DataProcesser:
         bw = np.expand_dims(bw, -1)
         input_features = request_np / np.tile(bw, [1, n_sd * n_paths])
         return input_features
+
+    @classmethod
+    def get_path_mask(cls,src,dst):
+        return cls._paths_mask[(src,dst)]
+
+    @classmethod
+    def actions_to_state(cls,obs,actions):
+        actions = np.array(actions)
+        actions = np.concatenate(actions,axis=1)
+        print(actions)
+        print(actions.shape)
+        obs_shape = np.shape(obs)
+        # print(obs_shape)
+        batch_size,num_nodes, num_flows_paths = np.shape(obs)
+        state = np.empty_like(obs)
+        for b in range(batch_size):
+            state[b,:,:] = obs[b,:,:]*actions[b,:]
+        state = np.nansum(state,axis=2)
+        print(state)
+        return state
