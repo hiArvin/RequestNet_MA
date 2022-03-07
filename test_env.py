@@ -1,6 +1,6 @@
 import numpy as np
 from env import Environment
-from replay_buffer import Buffer
+
 env = Environment(3)
 obs = env.reset()
 print(obs)

@@ -1,6 +1,7 @@
 import numpy as np
 import os
-from maddpg import MADDPG
+from maddpg.maddpg import MADDPG
+# from common.replay_buffer import ReplayBuffer
 
 
 def softmax(x):
@@ -8,19 +9,20 @@ def softmax(x):
     return f_x
 
 class Agent:
-    def __init__(self, args, src, dst):
+    def __init__(self,agent_id, args):
+        self.agent_id = agent_id
         self.args = args
-        self.policy = MADDPG(args, src, dst)
+        self.policy = MADDPG(agent_id, args)
+        # self.buffer = ReplayBuffer(args)
 
     def select_action(self, o, epsilon):
         # TODO: noise rate
         if np.random.uniform() < epsilon:
-            u = np.random.uniform(0,1, [self.args.num_paths])
-            u = softmax(u)
-            # print('random action')
+            u = np.random.uniform(0., 1., self.args.num_paths[self.agent_id])
+            u = u / np.sum(u)
         else:
             # inputs = torch.tensor(o, dtype=torch.float32).unsqueeze(0)
-            pi = self.policy.actor_network(o)
+            pi = self.policy.actor_network.predict(o).squeeze()
             u = pi
             # print('agent action')
             # print('{} : {}'.format(self.name, pi))

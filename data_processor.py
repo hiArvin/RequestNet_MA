@@ -32,7 +32,7 @@ class DataProcesser:
                 paths_np = self.path_to_array(paths)
                 DataProcesser._paths_mask[(node_i,node_j)] = paths_np
 
-    def k_shortest_paths(self, source, target, k=1, weight='weight'):
+    def k_shortest_paths(self, source, target, k=1):
         A = [nx.dijkstra_path(self.node_graph, source, target, weight='weight')]
         B = []
 

@@ -1,4 +1,4 @@
-from layers import PathEmbedding,FlowPointer
+from maddpg.layers import PathEmbedding,FlowPointer
 import  tensorflow as tf
 paths = [0,1,3,2,1]
 index = [0,0,1,1,1]
